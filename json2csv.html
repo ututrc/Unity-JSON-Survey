@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	<title>UX survey2json</title>
+	
+	<script type="text/javascript" src="papaparse.min.js"></script>
+	<script type="text/javascript" src="FileSaver.min.js"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<script>
+//Global input data array #fixme
+var inputData = [];
+var outputData = [];
+var surveyTitle = "";
+
+function updateInput() {
+
+	var nBytes = 0,
+	oFiles = document.getElementById("uploadInput").files,
+	nFiles = oFiles.length;
+      
+	for (var nFileId = 0; nFileId < nFiles; nFileId++) {
+		nBytes += oFiles[nFileId].size;
+
+		var reader = new FileReader();
+
+		// Closure to capture the file information.
+		reader.onload = (function(theFile) {
+			return function(e) {
+				//Parse the file into JSON
+				var inputJSON = JSON.parse(e.target.result, 'utf8');
+				
+				if(inputJSON == undefined || inputJSON.survey == undefined || inputJSON.survey.title == undefined || inputJSON.survey.questions == undefined) {
+					return;
+				}
+          
+				if(surveyTitle.length == 0) {
+        			surveyTitle = inputJSON.survey.title;
+	        		document.getElementById("surveyTitle").innerHTML = surveyTitle;
+				}
+          
+    	      	inputData.push(inputJSON);
+			};
+		})(oFiles[nFileId]);
+
+    	reader.readAsText(oFiles[nFileId]);
+	}
+  
+	var sOutput = nBytes + " bytes";
+	// optional code for multiples approximation
+	for (var aMultiples = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"], nMultiple = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, nMultiple++) {
+		sOutput = nApprox.toFixed(3) + " " + aMultiples[nMultiple] + " (" + nBytes + " bytes)";
+	}
+	document.getElementById("fileCount").innerHTML = nFiles;
+	document.getElementById("fileSize").innerHTML = sOutput;
+}
+
+function updateOutput() {
+	outputData = []
+	
+	var fields = [];
+	for(var column = 0; column < inputData[0].survey.questions.length; column++) {
+		fields.push(inputData[0].survey.questions[column].Question);
+	}
+		
+	var data = [];
+	for (var row = 0; row < inputData.length; row++) {
+		var answers = [];
+		for(var answer = 0; answer < inputData[row].survey.questions.length; answer++) {
+			answers.push(inputData[row].survey.questions[answer].Answer);
+		}		
+		data.push(answers);
+	}
+
+	outputData = Papa.unparse({fields: fields, data: data});
+
+	document.getElementById("output").innerHTML = outputData;
+}
+
+function downloadData() {
+	if(inputData.length > 0 && outputData.length > 0) {
+		var blob = new Blob([outputData], {type: "text/csv;charset=utf8"});
+		saveAs(blob, surveyTitle + ".csv");
+	}
+}
+</script>
+</head>
+
+<body onload="updateInput();">
+<div class="row">
+	<div class="col-md-6">
+		<h3>Survey info</h3>
+		<ul>
+			<li>Title: <span id="surveyTitle">N/A</span></li>
+			<li>Selected files: <span id="fileCount">0</span>
+			<li>Total file size: <span id="fileSize">0</span></li>
+		</ul>
+	</div>
+</div>
+<div class="row">
+	<div class="col-md-6">
+		<form name="uploadForm">
+		<div class="btn-group" role="group" aria-label="Tools">
+			<input id="uploadInput" class="btn btn-default"  type="file" name="myFiles" onchange="updateInput();" multiple>
+			<button type="button" class="btn btn-default" id="processButton" onclick="updateOutput();">Process data</button>
+			<button type="button" class="btn btn-default" id="downloadButton" onclick="downloadData();">Download</button>
+		</div>
+		</form>
+	</div>
+</div>
+<div class="row">
+	<div class="col-md-12">
+		<pre id="output"></pre>
+	</div>
+</div>
+
+</body>
+</html>
